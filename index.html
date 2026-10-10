@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f3f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0f12" media="(prefers-color-scheme: dark)">
+<title>홈</title>
+<style>
+  :root {
+    --bg: #f2f3f5; --card: #ffffff; --text: #15171c; --sub: #737885;
+    --line: #e3e5ea; --danger: #e5484d; --accent: #3b6cf6; --eng: #03c75a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e0f12; --card: #1b1d22; --text: #eceef2; --sub: #8a909c;
+      --line: #2b2e35; --danger: #ff6369; --accent: #6b8cff;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "SamsungOne", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+    min-height: 100dvh;
+    padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 140px);
+  }
+  .wrap { max-width: 520px; margin: 0 auto; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  .top { display: flex; justify-content: flex-end; gap: 4px; min-height: 36px; }
+  .top button { border: 0; background: none; color: var(--sub); font-size: 13px; padding: 8px 10px; border-radius: 10px; }
+  body.editing #editBtn { background: var(--accent); color: #fff; }
+
+  section { margin-top: 18px; }
+  .ghead { display: flex; align-items: center; gap: 4px; margin: 0 4px 10px; }
+  .ghead h2 { margin: 0; flex: 1; font-size: 13px; font-weight: 600; color: var(--sub); cursor: pointer; user-select: none; }
+  .ghead h2::after { content: " ▾"; font-size: 11px; opacity: .6; }
+  section.collapsed .ghead h2::after { content: " ▸"; }
+  body:not(.editing) section.collapsed .list { display: none; }
+  body.editing .ghead h2::after { content: ""; }
+  .ghead button { display: none; border: 0; background: none; color: var(--sub); font-size: 18px; padding: 2px 8px; line-height: 1; }
+  body.editing .ghead button { display: block; }
+  .ghead .handle { cursor: grab; touch-action: none; font-size: 17px; padding-left: 0; }
+  body.editing section { background: color-mix(in srgb, var(--card) 45%, transparent); border: 1px dashed var(--line); border-radius: 16px; padding: 10px 8px 12px; }
+  .sortable-ghost { opacity: .3; }
+  .sortable-chosen .ico, .cards .sortable-chosen { box-shadow: 0 6px 18px rgb(0 0 0 / .18); }
+  .editTip { display: none; text-align: center; font-size: 12.5px; color: var(--accent); margin: 4px 0 -6px; }
+  body.editing .editTip { display: block; }
+  body.editing .hint { display: none; }
+
+  .item { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+
+  /* 아이콘형 */
+  .icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 16px 4px; }
+  .icons .item { display: flex; flex-direction: column; align-items: center; gap: 7px; text-decoration: none; color: var(--text); font-size: 12.5px; min-width: 0; background: none; border: 0; padding: 0; }
+  .icons .ico {
+    width: 54px; height: 54px; border-radius: 17px; background: var(--card); border: 1px solid var(--line);
+    display: grid; place-items: center; font-size: 26px; color: var(--sub); overflow: hidden;
+  }
+  .icons .ico img { width: 28px; height: 28px; }
+  .icons .name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* 카드형: 이름으로 구분 */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
+  .cards .item {
+    display: flex; flex-direction: column; justify-content: space-between; gap: 8px; text-align: left;
+    min-height: 68px; padding: 11px 12px; border-radius: 14px; text-decoration: none; color: var(--text);
+    background: var(--card); border: 1px solid var(--line); position: relative; overflow: hidden;
+  }
+  .cards .item::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--g); }
+  .cards .ico { width: 16px; height: 16px; font-size: 14px; line-height: 16px; }
+  .cards .ico img { width: 16px; height: 16px; display: block; }
+  .cards .name { font-size: 14.5px; font-weight: 600; line-height: 1.3; word-break: keep-all; }
+
+  .item:active { transform: scale(.96); }
+  body.editing .icons a.item .ico, body.editing .cards a.item { border: 1.5px dashed var(--sub); }
+
+  /* 추가 버튼 (빠른 실행처럼 항상 보임) */
+  .icons .add .ico { border-style: dashed; background: transparent; font-weight: 300; }
+  .icons .add { color: var(--sub); }
+  .cards .add { align-items: center; justify-content: center; color: var(--sub); border-style: dashed; background: transparent; font-size: 22px; font-weight: 300; }
+  .cards .add::before { display: none; }
+
+  .editBar { display: none; gap: 8px; margin-top: 28px; }
+  body.editing .editBar { display: flex; }
+  .editBar button { flex: 1; border: 1px dashed var(--line); background: transparent; border-radius: 14px; padding: 14px; font-size: 14px; color: var(--sub); }
+  .welcome { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 28px 20px; margin-top: 12vh; text-align: center; }
+  .welcome h3 { margin: 0 0 8px; font-size: 19px; }
+  .welcome p { margin: 0 0 20px; color: var(--sub); font-size: 14px; }
+  .welcome button { display: block; width: 100%; border: 0; border-radius: 14px; padding: 14px; font-size: 16px; margin-top: 8px; background: var(--bg); }
+  .welcome .primary { background: var(--accent); color: #fff; font-weight: 600; }
+  .hint { text-align: center; color: var(--sub); font-size: 12px; margin-top: 26px; opacity: .7; }
+
+  /* 하단 검색 */
+  form.search {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    padding: 18px 16px calc(env(safe-area-inset-bottom) + 12px);
+    background: linear-gradient(to top, var(--bg) 75%, transparent);
+  }
+  .engines, .sbox { max-width: 520px; margin: 0 auto; }
+  .engines { display: flex; gap: 6px; margin-bottom: 8px; }
+  .engines button {
+    border: 1px solid var(--line); background: var(--card); color: var(--sub);
+    border-radius: 16px; padding: 6px 13px; font-size: 13px; font-weight: 600;
+  }
+  .engines button.on { background: var(--eng); border-color: var(--eng); color: #fff; }
+  .sbox {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--card); border: 2px solid var(--eng); border-radius: 26px; padding: 5px 5px 5px 18px;
+  }
+  .sbox input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 16px; padding: 10px 0; }
+  .sbox button { border: 0; width: 40px; height: 40px; border-radius: 50%; background: var(--eng); color: #fff; font-size: 17px; flex: none; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 150px); transform: translateX(-50%);
+    background: var(--text); color: var(--bg); font-size: 14px; padding: 10px 16px; border-radius: 12px;
+    opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* 다이얼로그 */
+  dialog {
+    border: 1px solid var(--line); border-radius: 20px; background: var(--card); color: var(--text);
+    width: min(92vw, 400px); padding: 20px; max-height: 88dvh;
+  }
+  dialog::backdrop { background: rgb(0 0 0 / .5); }
+  dialog h3 { margin: 0 0 12px; font-size: 17px; }
+  dialog label { display: block; font-size: 13px; color: var(--sub); margin: 12px 0 5px; }
+  dialog input, dialog select, dialog textarea {
+    width: 100%; padding: 12px; font-size: 16px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); font-family: inherit;
+  }
+  dialog textarea { height: 180px; font: 12px/1.4 monospace; }
+  dialog p { font-size: 13px; color: var(--sub); margin: 0 0 10px; line-height: 1.5; }
+  .inrow { display: flex; gap: 6px; }
+  .inrow input { flex: 1; min-width: 0; }
+  .inrow button { flex: none; border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 0 12px; font-size: 14px; }
+  .emojis { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .emojis button { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; width: 38px; height: 38px; font-size: 19px; padding: 0; }
+  .emojis button.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .seg { display: flex; gap: 6px; }
+  .seg button { flex: 1; border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 10px; font-size: 14px; }
+  .seg button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .row { display: flex; gap: 8px; margin-top: 18px; align-items: center; }
+  .row .sp { flex: 1; }
+  .row button { border: 0; border-radius: 12px; padding: 11px 16px; font-size: 15px; background: var(--bg); }
+  .row .primary { background: var(--accent); color: #fff; }
+  .row .danger { background: none; color: var(--danger); padding-left: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <button id="dataBtn" hidden>백업·가져오기</button>
+    <button id="editBtn">편집</button>
+  </div>
+  <div class="editTip">꾹 눌러 끌면 순서 변경 · ≡ 를 끌면 카테고리 이동 · 탭하면 수정</div>
+  <div id="groups"></div>
+  <div class="editBar">
+    <button id="addGroupBtn">+ 카테고리 추가</button>
+  </div>
+  <div class="hint">길게 누르면 수정 · 카테고리 이름을 누르면 접기</div>
+</div>
+
+<form class="search" id="search">
+  <div class="engines" id="engines"></div>
+  <div class="sbox">
+    <input id="q" type="search" autocomplete="off" enterkeyhint="search">
+    <button type="submit" aria-label="검색">→</button>
+  </div>
+</form>
+
+<div class="toast" id="toast"></div>
+
+<!-- 링크 추가/수정 -->
+<dialog id="itemDlg">
+  <h3 id="itemTitle">링크</h3>
+  <label for="itemUrl">주소</label>
+  <div class="inrow">
+    <input id="itemUrl" inputmode="url" placeholder="https://...">
+    <button type="button" id="pasteBtn">붙여넣기</button>
+  </div>
+  <label for="itemName">이름</label>
+  <input id="itemName" placeholder="예: 수리요청">
+  <label for="itemIcon">아이콘 <span style="opacity:.7">(비우면 사이트 아이콘)</span></label>
+  <input id="itemIcon" placeholder="이모지 하나" maxlength="4">
+  <div class="emojis" id="emojis"></div>
+  <label for="itemGroup">카테고리</label>
+  <select id="itemGroup"></select>
+  <div class="row">
+    <button type="button" class="danger" id="itemDel">삭제</button>
+    <span class="sp"></span>
+    <button type="button" id="itemCancel">취소</button>
+    <button type="button" class="primary" id="itemSave">저장</button>
+  </div>
+</dialog>
+
+<!-- 그룹 편집 -->
+<dialog id="groupDlg">
+  <h3 id="groupTitle">카테고리</h3>
+  <label for="groupName">이름</label>
+  <input id="groupName" placeholder="예: 업무">
+  <label>모양</label>
+  <div class="seg" id="groupLayout">
+    <button type="button" data-v="icons">아이콘</button>
+    <button type="button" data-v="cards">이름 카드</button>
+  </div>
+  <div class="row">
+    <button type="button" class="danger" id="groupDel">삭제</button>
+    <span class="sp"></span>
+    <button type="button" id="groupCancel">취소</button>
+    <button type="button" class="primary" id="groupSave">저장</button>
+  </div>
+</dialog>
+
+<!-- 백업 / 가져오기 -->
+<dialog id="dataDlg">
+  <h3>백업 · 가져오기</h3>
+  <p>지금 설정이 아래에 들어 있어요. 복사해 두면 백업이 되고, 다른 내용을 붙여넣고 <b>가져오기</b>를 누르면 그걸로 바뀌어요.</p>
+  <textarea id="dataText" spellcheck="false"></textarea>
+  <div class="row">
+    <button type="button" id="copyBtn">복사</button>
+    <span class="sp"></span>
+    <button type="button" id="dataClose">닫기</button>
+    <button type="button" class="primary" id="importBtn">가져오기</button>
+  </div>
+</dialog>
+
+<script>
+const KEY = 'home.v2';
+// 링크는 코드에 넣지 않습니다. 이 휴대폰 브라우저에만 저장돼요 (첫 화면에서 붙여넣기).
+const DEFAULTS = { engine: 'naver', groups: [] };
+const ENGINES = {
+  naver:  { label: '네이버', color: '#03c75a', url: q => 'https://search.naver.com/search.naver?query=' + q },
+  google: { label: '구글',   color: '#4285f4', url: q => 'https://www.google.com/search?q=' + q },
+  gemini: { label: 'Gemini', color: '#8e6cf0', url: q => 'https://gemini.google.com/app?q=' + q, copy: true },
+  gpt:    { label: 'GPT',    color: '#10a37f', url: q => 'https://chatgpt.com/?q=' + q },
+};
+const EMOJIS = ['💬','📚','📊','🧾','🏅','📝','📁','📅','🏠','🛒','🎮','🎬','🎵','📰','💰','⭐'];
+const HUES = [215, 150, 30, 280, 350, 190];
+
+const $ = s => document.querySelector(s);
+const clone = o => JSON.parse(JSON.stringify(o));
+
+function valid(s) { return s && Array.isArray(s.groups) && s.groups.every(g => typeof g.name === 'string' && Array.isArray(g.items)); }
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (valid(s)) return s; } catch {}
+  return clone(DEFAULTS);
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} }
+let state = load();
+
+const normUrl = u => { u = u.trim(); return /^[a-z]+:\/\//i.test(u) ? u : 'https://' + u; };
+const host = u => { try { return new URL(normUrl(u)).hostname; } catch { return ''; } };
+const editing = () => document.body.classList.contains('editing');
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function iconEl(it) {
+  const box = document.createElement('div');
+  box.className = 'ico';
+  if (it.icon) { box.textContent = it.icon; return box; }
+  const img = new Image();
+  img.alt = ''; img.loading = 'lazy';
+  img.src = `https://www.google.com/s2/favicons?domain=${host(it.url)}&sz=64`;
+  img.onerror = () => { img.remove(); box.textContent = it.name.slice(0, 1); };
+  box.append(img);
+  return box;
+}
+
+// 길게 누르기 → 수정 (빠른 실행처럼)
+function onLongPress(el, fn) {
+  let timer, fired = false, sx, sy;
+  el.addEventListener('pointerdown', e => {
+    fired = false; sx = e.clientX; sy = e.clientY;
+    if (editing()) return; // 편집 모드에선 길게 누르기 = 끌기
+    timer = setTimeout(() => { fired = true; navigator.vibrate?.(15); fn(); }, 480);
+  });
+  el.addEventListener('pointermove', e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 10) clearTimeout(timer); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, () => clearTimeout(timer)));
+  el.addEventListener('contextmenu', e => e.preventDefault());
+  el.addEventListener('click', e => { if (fired) { e.preventDefault(); fired = false; } }, true);
+}
+
+function render() {
+  const root = $('#groups');
+  root.innerHTML = '';
+  state.groups.forEach((g, gi) => {
+    const sec = document.createElement('section');
+    sec.dataset.gi = gi;
+    sec.classList.toggle('collapsed', !!g.collapsed);
+    sec.style.setProperty('--g', `hsl(${HUES[gi % HUES.length]} 65% 55%)`);
+
+    const head = document.createElement('div');
+    head.className = 'ghead';
+    const handle = document.createElement('button'); handle.className = 'handle'; handle.textContent = '≡'; handle.ariaLabel = '카테고리 끌어서 이동';
+    const h2 = document.createElement('h2'); h2.textContent = g.name;
+    h2.onclick = () => { if (editing()) return openGroup(gi); g.collapsed = !g.collapsed; save(); sec.classList.toggle('collapsed', g.collapsed); };
+    const more = document.createElement('button'); more.textContent = '⋯'; more.ariaLabel = `${g.name} 카테고리 설정`;
+    more.onclick = () => openGroup(gi);
+    head.append(handle, h2, more);
+
+    const list = document.createElement('div');
+    list.className = 'list ' + (g.layout === 'cards' ? 'cards' : 'icons');
+    list.dataset.gi = gi;
+    g.items.forEach((it, ii) => {
+      const a = document.createElement('a');
+      a.className = 'item'; a.href = it.url;
+      a.dataset.gi = gi; a.dataset.ii = ii;
+      const name = document.createElement('span'); name.className = 'name'; name.textContent = it.name;
+      a.append(iconEl(it), name);
+      a.addEventListener('click', e => { if (editing()) { e.preventDefault(); openItem(gi, ii); } });
+      onLongPress(a, () => openItem(gi, ii));
+      list.append(a);
+    });
+
+    const add = document.createElement('button');
+    add.className = 'item add'; add.ariaLabel = `${g.name}에 링크 추가`;
+    if (g.layout === 'cards') add.textContent = '+';
+    else {
+      const ic = document.createElement('div'); ic.className = 'ico'; ic.textContent = '+';
+      const n = document.createElement('span'); n.className = 'name'; n.textContent = '추가';
+      add.append(ic, n);
+    }
+    add.onclick = () => openItem(gi, -1);
+    list.append(add);
+
+    sec.append(head, list);
+    root.append(sec);
+  });
+  if (!state.groups.length) {
+    root.innerHTML = `
+      <div class="welcome">
+        <h3>처음 오셨네요</h3>
+        <p>저장해 둔 설정을 복사한 뒤 아래 버튼을 누르세요.</p>
+        <button type="button" class="primary" id="wPaste">설정 붙여넣기</button>
+        <button type="button" id="wNew">빈 화면으로 시작</button>
+      </div>`;
+    $('#wPaste').onclick = async () => {
+      let t = '';
+      try { t = await navigator.clipboard.readText(); } catch {}
+      if (t.trim()) { $('#dataText').value = t; $('#importBtn').click(); }
+      else { $('#dataText').value = ''; $('#dataDlg').showModal(); toast('여기에 길게 눌러 붙여넣은 뒤 가져오기'); }
+    };
+    $('#wNew').onclick = () => { state.groups.push({ name: '자주 가는 곳', layout: 'icons', items: [] }); save(); render(); };
+  }
+  if (editing()) setupSortable();
+}
+
+// ── 끌어서 순서 바꾸기 (편집 모드에서만 라이브러리를 불러와 평소엔 가볍게)
+let sortables = [];
+function loadSortable() {
+  if (window.Sortable) return Promise.resolve();
+  return loadSortable.p ||= new Promise((ok, fail) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js';
+    s.onload = ok; s.onerror = () => { loadSortable.p = null; fail(); };
+    document.head.append(s);
+  });
+}
+function readOrderFromDom() {
+  const old = state.groups;
+  state.groups = [...document.querySelectorAll('#groups > section')].map(sec => {
+    const g = old[+sec.dataset.gi];
+    const items = [...sec.querySelectorAll('a.item')].map(a => old[+a.dataset.gi].items[+a.dataset.ii]);
+    return { ...g, items };
+  });
+  save(); render();
+}
+async function setupSortable() {
+  sortables.forEach(s => s.destroy()); sortables = [];
+  try { await loadSortable(); } catch { toast('순서 편집 기능을 불러오지 못했어요 (인터넷 확인)'); return; }
+  if (!editing()) return;
+  const common = { animation: 160, delay: 180, delayOnTouchOnly: true, touchStartThreshold: 5, forceFallback: true, fallbackTolerance: 4, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen' };
+  document.querySelectorAll('#groups .list').forEach(list => {
+    sortables.push(Sortable.create(list, {
+      ...common, group: 'links', draggable: 'a.item', filter: '.add',
+      emptyInsertThreshold: 30, onEnd: readOrderFromDom,
+    }));
+  });
+  sortables.push(Sortable.create($('#groups'), {
+    ...common, delay: 0, handle: '.handle', draggable: 'section', onEnd: readOrderFromDom,
+  }));
+}
+
+// ── 검색
+function renderEngines() {
+  const box = $('#engines'); box.innerHTML = '';
+  const cur = ENGINES[state.engine] ? state.engine : 'naver';
+  Object.entries(ENGINES).forEach(([id, e]) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = e.label;
+    b.classList.toggle('on', id === cur);
+    b.onclick = () => { state.engine = id; save(); renderEngines(); $('#q').focus(); };
+    box.append(b);
+  });
+  document.documentElement.style.setProperty('--eng', ENGINES[cur].color);
+  $('#q').placeholder = `${ENGINES[cur].label}${cur === 'gemini' || cur === 'gpt' ? '에게 물어보기' : ' 검색'}`;
+}
+$('#search').onsubmit = async e => {
+  e.preventDefault();
+  const q = $('#q').value.trim();
+  const eng = ENGINES[state.engine] || ENGINES.naver;
+  if (!q) return;
+  if (eng.copy) {
+    // Gemini는 주소로 질문 전달이 공식 지원되지 않아, 클립보드에도 복사해 둡니다.
+    try { await navigator.clipboard.writeText(q); toast('질문을 복사했어요. 안 들어가 있으면 붙여넣기'); } catch {}
+    setTimeout(() => location.href = eng.url(encodeURIComponent(q)), 700);
+  } else location.href = eng.url(encodeURIComponent(q));
+};
+
+// ── 편집 모드 (순서·카테고리 관리 / 백업)
+$('#editBtn').onclick = () => {
+  const on = document.body.classList.toggle('editing');
+  $('#editBtn').textContent = on ? '완료' : '편집';
+  $('#dataBtn').hidden = !on;
+  if (!on) { sortables.forEach(s => s.destroy()); sortables = []; }
+  render();
+};
+
+// ── 링크 다이얼로그
+let cur = null; // { gi, ii }
+function pickEmoji(v) {
+  $('#itemIcon').value = v;
+  document.querySelectorAll('#emojis button').forEach(b => b.classList.toggle('on', b.textContent === v));
+}
+EMOJIS.forEach(em => {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = em;
+  b.onclick = () => pickEmoji($('#itemIcon').value === em ? '' : em);
+  $('#emojis').append(b);
+});
+$('#itemIcon').oninput = () => pickEmoji($('#itemIcon').value.trim());
+
+function openItem(gi, ii) {
+  cur = { gi, ii };
+  const it = ii >= 0 ? state.groups[gi].items[ii] : { name: '', url: '' };
+  $('#itemTitle').textContent = ii >= 0 ? '링크 수정' : '링크 추가';
+  $('#itemUrl').value = it.url;
+  $('#itemName').value = it.name;
+  pickEmoji(it.icon || '');
+  $('#itemGroup').innerHTML = '';
+  state.groups.forEach((g, i) => $('#itemGroup').add(new Option(g.name, i, false, i === gi)));
+  $('#itemDel').hidden = ii < 0;
+  $('#itemDlg').showModal();
+  if (ii < 0) $('#itemUrl').blur();
+}
+function guessName() {
+  if ($('#itemName').value.trim()) return;
+  const h = host($('#itemUrl').value).replace(/^(www|m)\./, '');
+  if (h) $('#itemName').value = h.split('.')[0];
+  $('#itemName').focus(); $('#itemName').select();
+}
+$('#pasteBtn').onclick = async () => {
+  try {
+    const t = (await navigator.clipboard.readText()).trim();
+    if (!t) return toast('클립보드가 비어 있어요');
+    $('#itemUrl').value = t; guessName();
+  } catch { $('#itemUrl').focus(); toast('주소칸을 길게 눌러 붙여넣어 주세요'); }
+};
+$('#itemUrl').addEventListener('change', guessName);
+
+$('#itemCancel').onclick = () => $('#itemDlg').close();
+$('#itemDel').onclick = () => {
+  if (!confirm('이 링크를 삭제할까요?')) return;
+  state.groups[cur.gi].items.splice(cur.ii, 1); save(); render(); $('#itemDlg').close();
+};
+$('#itemSave').onclick = () => {
+  const name = $('#itemName').value.trim(), url = $('#itemUrl').value.trim(), icon = $('#itemIcon').value.trim();
+  if (!name || !url) { alert('주소와 이름을 모두 입력해 주세요'); return; }
+  const it = { name, url: normUrl(url) };
+  if (icon) it.icon = icon;
+  const to = +$('#itemGroup').value;
+  if (cur.ii >= 0) {
+    if (to === cur.gi) state.groups[cur.gi].items[cur.ii] = it;
+    else { state.groups[cur.gi].items.splice(cur.ii, 1); state.groups[to].items.push(it); }
+  } else state.groups[to].items.push(it);
+  save(); render(); $('#itemDlg').close();
+};
+
+// ── 그룹 다이얼로그
+let curG = -1, curLayout = 'icons';
+function setLayout(v) {
+  curLayout = v;
+  document.querySelectorAll('#groupLayout button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+}
+document.querySelectorAll('#groupLayout button').forEach(b => b.onclick = () => setLayout(b.dataset.v));
+function openGroup(gi) {
+  curG = gi;
+  const g = gi >= 0 ? state.groups[gi] : { name: '', layout: 'cards' };
+  $('#groupName').value = g.name;
+  setLayout(g.layout);
+  $('#groupDel').hidden = gi < 0;
+  $('#groupTitle').textContent = gi >= 0 ? '카테고리 수정' : '카테고리 추가';
+  $('#groupDlg').showModal();
+}
+$('#addGroupBtn').onclick = () => openGroup(-1);
+$('#groupCancel').onclick = () => $('#groupDlg').close();
+$('#groupDel').onclick = () => {
+  const g = state.groups[curG];
+  if (!confirm(`'${g.name}' 카테고리와 안의 링크 ${g.items.length}개를 삭제할까요?`)) return;
+  state.groups.splice(curG, 1); save(); render(); $('#groupDlg').close();
+};
+$('#groupSave').onclick = () => {
+  const name = $('#groupName').value.trim();
+  if (!name) { alert('카테고리 이름을 입력해 주세요'); return; }
+  if (curG >= 0) Object.assign(state.groups[curG], { name, layout: curLayout });
+  else state.groups.push({ name, layout: curLayout, items: [] });
+  save(); render(); $('#groupDlg').close();
+};
+
+// ── 백업 / 가져오기
+$('#dataBtn').onclick = () => { $('#dataText').value = JSON.stringify(state, null, 1); $('#dataDlg').showModal(); };
+$('#dataClose').onclick = () => $('#dataDlg').close();
+$('#copyBtn').onclick = async () => {
+  try { await navigator.clipboard.writeText($('#dataText').value); $('#copyBtn').textContent = '복사됨'; }
+  catch { $('#dataText').select(); }
+  setTimeout(() => $('#copyBtn').textContent = '복사', 1500);
+};
+$('#importBtn').onclick = () => {
+  let s;
+  try { s = JSON.parse($('#dataText').value); } catch { alert('형식이 올바르지 않아요'); return; }
+  if (!valid(s)) { alert('형식이 올바르지 않아요'); return; }
+  if (!confirm('지금 설정을 이 내용으로 바꿀까요?')) return;
+  state = s; save(); render(); renderEngines(); $('#dataDlg').close();
+};
+
+render();
+renderEngines();
+</script>
+</body>
+</html>
